@@ -1,0 +1,222 @@
+﻿<AML>
+ <Item type="Method" id="09EC0A92EF9542809D9B675D69083994" action="add">
+  <execution_allowed_to keyed_name="World" type="Identity">A73B655731924CD0B027E4F4D5FCC0A9</execution_allowed_to>
+  <method_code><![CDATA[/*
+<Method Name>NA_DEN_SP_LinkToSalesPlan</Method Name>
+<Author>Nikita Jani</Author>
+<Copyright>SteepGraph System Pvt. Ltd</Copyright>
+<Created on>7/25/2023</Created on>
+<Modified On>8/25/2023</Modified On>
+Purpose:This method is use for fatching data and sending data to another method
+Triggers:OnClick
+Modified By :
+*/
+
+
+
+
+
+debugger;
+var inn = aras.newIOMInnovator();
+var data_table;
+
+var densoSalesSelect = document.getElementsByTagName('select').na_den_sp_denso_sales_affiliate;
+var customerNumSelect = document.getElementsByTagName('select').na_den_sp_customer_number;
+var productionPlantSelect = document.getElementsByTagName('select').na_den_sp_denso_production_plant;
+var selectedDensoSales = Array.from(densoSalesSelect.selectedOptions).map(option => option.value);
+var selectedCustomerNumbers = Array.from(customerNumSelect.selectedOptions).map(option => option.value);
+var selectedProductionPlants = Array.from(productionPlantSelect.selectedOptions).map(option => option.value);
+const Dictionary1 = {
+    "na_den_sp_denso_sales_affiliate": "select",
+    "na_den_sp_customer_number": "select",
+    "na_den_sp_denso_production_plant": "select"
+};
+
+const dbName = [];
+
+const OrderbyList =[
+    "Customer Part Number",
+    "Customer Number",
+    "Part ID",
+    "Model Code GSPS 2 5"
+    ];
+    
+const Dictionary = {
+    "na_den_sp_denso_sales_affiliate": "DENSO Sales Affiliate",
+    "na_den_sp_customer": "Customer",
+    "na_den_sp_customer_number": "Customer Number",
+    "na_den_sp_productgroup": "Product Group",
+    "na_den_sp_productdivision": "Product Division",
+    "na_den_sp_assembly_name": "Assembly Name",
+    "na_den_sp_denso_production_plant": "DENSO Plant",
+    "na_den_sp_customer_part":"Customer Part Number",
+    "na_den_sp_dn_part": "DENSO Part Number",
+    "na_den_sp_partsop": "Part SOP",
+    "na_den_sp_parteop": "Part EOP"
+};
+// Convert the Dictionary object to a JSON string
+const dictionaryString = JSON.stringify(Dictionary);
+
+// Store the JSON string in local storage with a specific key
+sessionStorage.setItem('dictionaryData', dictionaryString);
+//sessionStorage.setItem('key', 'value');
+
+// To retrieve it later, you can use localStorage.getItem('dictionaryData')
+const customerPartNumberKey = "na_den_sp_customer_part"; // Key to search
+
+// Find the position (index) of the key in the Dictionary object
+const position = Object.keys(Dictionary).indexOf(customerPartNumberKey);
+localStorage.setItem("customerPartNumberPosition", position);
+
+const additionSelectList =["Part ID", "Model Code GSPS 2 5"];
+//we have to include part id in sorting   Part ID
+
+const cDBTableToHTMLTableColumnMapping = {
+    "Customer Number": "Customer Rep Number",
+}
+
+const inputFieldTags = ["INPUT"];
+const selectFieldTags = ["SELECT"];
+
+// Define a function to check if an element is an input field
+function isInputField(element) {
+    return inputFieldTags.includes(element.tagName);
+}
+
+// Define a function to check if an element is a select field
+function isSelectField(element) {
+    return selectFieldTags.includes(element.tagName);
+}
+
+const requiredFields = {
+    "na_den_sp_denso_sales_affiliate": "DENSO Sales Affiliate ",
+    "na_den_sp_customer": "Customer(Sales Plan)",
+    "na_den_sp_customer_number": "Customer Rep Number",
+    "na_den_sp_productgroup": "Product Group",
+    "na_den_sp_productdivision": "Product Division",
+    "na_den_sp_assembly_name": "Assembly Name / Code",
+    "na_den_sp_denso_production_plant": "DENSO Production Plant"
+};
+
+let missingFields = [];
+
+const whereClauseParts = [];
+
+for (const key in Dictionary) {// "na_den_sp_denso_sales_affiliate": "DENSO Sales Affiliate",
+    
+    const columnName = Dictionary[key];
+    if (Dictionary1[key]=="select") {
+        const value = document.getElementsByTagName('select')[key].i_value;//AND [Customer Number] IN ('${selectedCustomerNumbers.join("', '")}')
+        if( value==null || value==undefined || value=="" ){
+            if (requiredFields.hasOwnProperty(key)) {
+             missingFields.push(columnName);
+             } else {
+            continue;
+             }
+        }
+        //const value_list=Array.from((document.getElementsByTagName('select').[key]).selectedOptions).map(option => option.value);
+        const value_list = Array.from(document.getElementsByTagName('select')[key].selectedOptions).map(option => option.value);
+
+        //const value_list = Array.from(document.getElementsByTagName('select')[key]).map(option => option.value)
+        // Array.from(customerNumSelect.selectedOptions).map(option => option.value)
+        whereClauseParts.push(`[${columnName}] IN ('${value_list.join("', '")}')`);
+    } 
+    else {
+        const value = document.getElementsByTagName('input')[key].value;
+        if( value===null || value===undefined || value==="" ){
+            if (key in requiredFields) {
+             missingFields.push(columnName);
+             } else {
+            continue;
+             }
+        }
+        whereClauseParts.push(`[${columnName}] = '${value}'`);
+    }
+}
+
+if (missingFields.length > 0) {
+    parent.document.getElementsByClassName('aras-item-view__relationship-accordion aras-accordion')[0].style.display = 'none';
+    aras.AlertError("Please Select the following mandatory fields:\n" + missingFields.join("\n"));
+    return this;
+}
+else{
+    parent.document.getElementsByClassName('aras-item-view__relationship-accordion aras-accordion')[0].style.display = 'block'; 
+}
+
+
+const whereClause = `WHERE ${whereClauseParts.join(' AND ')}`;
+
+
+// Constructing the ORDER BY clause
+//const orderByClause = "ORDER BY [Customer Part Number]";
+const orderByClause = `ORDER BY ${OrderbyList.map(column => `[${column}]`).join(", ")}`;
+let clauseArray  = [];
+for (let key of Object.keys(Dictionary)) {
+  const value = Dictionary[key];
+  // Apply your if-else conditions here
+  if (value in cDBTableToHTMLTableColumnMapping) {
+ clauseArray.push(`[${value}] As [${cDBTableToHTMLTableColumnMapping[value]}]`);
+  } else {
+   clauseArray.push(`[${value}]`);
+  }
+}
+
+// Join the results with a comma
+let selectClause = clauseArray.join(", ");
+
+
+selectClause +=","+ `${additionSelectList.map(column => `[${column}]`).join(", ")}`;
+
+ let dbNameString = "";
+
+for (let i = 0; i < dbName.length; i++) {
+  dbNameString += `[${dbName[i]}]`;
+
+  if (i < dbName.length - 1) {
+    dbNameString += ".";
+  }
+}
+
+const query = `SELECT ${selectClause} FROM ${dbNameString} ${whereClause} ${orderByClause}`;
+
+// Execute the SQL query and store the result in data_table
+data_table = inn.applyMethod("NA_DEN_SP_SqlConnection", `<Query>${query}</Query>`);
+var Header_names=data_table.getProperty("Header_Names");
+// Remove the leading comma and then split the string into an array
+let fileList = Header_names.slice(1).split(',');
+if(data_table != null){
+   parent.document.getElementsByClassName('aras-item-view__relationship-accordion aras-accordion')[0].style.display='block'; 
+}
+else{
+    aras.AlertError("Table is not Connected");
+    parent.document.getElementsByClassName('aras-item-view__relationship-accordion aras-accordion')[0].style.display='none';
+}
+
+if (data_table.node.getElementsByTagName("row")[0].innerHTML === "0") {
+    var tabLabel = inn.applyMethod("NA_DEN_SP_Get_Rel_Tab_Name","<relName>NA_DEN_SP_LinkToSalesPlan</relName>");
+var tablabel1= tabLabel.getResult();
+var TabLabelId = parent.relationships.relTabbar.GetTabId(tablabel1);
+parent.relationships.iframesCollection[TabLabelId].contentWindow.location.reload();
+    aras.AlertWarning("No Search Result Found");
+    parent.document.getElementsByClassName('aras-item-view__relationship-accordion aras-accordion')[0].style.display='none';
+
+    return this;
+}
+
+ 
+// Store the query result and fileList in localStorage
+localStorage.setItem("Query", data_table.ToString());
+localStorage.setItem("fileList", fileList);
+
+ 
+// Reload the parent window
+var tabLabel = inn.applyMethod("NA_DEN_SP_Get_Rel_Tab_Name","<relName>NA_DEN_SP_LinkToSalesPlan</relName>");
+var tablabel1= tabLabel.getResult();
+var TabLabelId = parent.relationships.relTabbar.GetTabId(tablabel1);
+parent.relationships.iframesCollection[TabLabelId].contentWindow.location.reload();
+// Return from the function
+return this;]]></method_code>
+  <method_type>JavaScript</method_type>
+  <name>NA_DEN_SP_LinkToSalesPlan</name>
+ </Item>
+</AML>

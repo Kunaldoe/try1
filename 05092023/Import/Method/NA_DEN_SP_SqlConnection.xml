@@ -1,0 +1,122 @@
+﻿<AML>
+ <Item type="Method" id="465299F64F4E4E85B6EC4C19E703DE00" action="add">
+  <execution_allowed_to keyed_name="World" type="Identity">A73B655731924CD0B027E4F4D5FCC0A9</execution_allowed_to>
+  <method_code><![CDATA[/*
+<Method Name>NA_DEN_SP_SqlConnection</Method Name>
+<Author>Nikita Jani</Author>
+<Copyright>SteepGraph System Pvt. Ltd</Copyright>
+<Created on>7/25/2023</Created on>
+<Modified On>8/11/2023</Modified On>
+Purpose:This method is use to send the data to sql and fatch the data from sql
+Triggers:
+Modified By :
+*/
+
+Innovator inn=this.getInnovator();
+string Query= this.getProperty("Query");
+CCO.Utilities.WriteDebug("Kunal",Query);
+Item variable = inn.newItem("Variable", "get");
+variable.setProperty("name", "DOMO_DB_NAME");
+variable = variable.apply();
+//string databaseNames = "["+variable.getProperty("value")+"]";//"12Sp14", "dbo", "Saphran Data"
+//[12Sp14].[dbo].[Saphran Data]
+string databaseNames = variable.getProperty("value"); // Assuming variable.GetProperty("value") returns "12Sp14", "dbo", "Saphran Data"
+
+// Split the string into parts using comma as the separator
+string[] parts = databaseNames.Split(',');
+
+// Add square brackets around each part and join them with periods
+string formattedDatabaseNames = "[" + string.Join("].[", parts) + "]";
+
+
+int fromIndex = Query.IndexOf("FROM", StringComparison.OrdinalIgnoreCase);
+string modifiedQuery="";
+if (fromIndex >= 0)
+{
+    int whereIndex = Query.IndexOf("WHERE", fromIndex, StringComparison.OrdinalIgnoreCase);
+
+    if (whereIndex >= 0)
+    {
+        // Split the original query into three parts: before "FROM", between "FROM" and "WHERE", and after "WHERE"
+        string beforeFrom = Query.Substring(0, fromIndex);
+        string betweenFromAndWhere = Query.Substring(fromIndex, whereIndex - fromIndex);
+        string afterWhere = Query.Substring(whereIndex);
+
+        // Combine the parts with formattedDatabaseNames inserted between the first "FROM" and "WHERE"
+         modifiedQuery = $"{beforeFrom} FROM {formattedDatabaseNames} {betweenFromAndWhere} {afterWhere}";
+         modifiedQuery = modifiedQuery.Replace("FROM   WHERE", "WHERE");
+
+        // Use modifiedQuery as the updated SQL query
+        //Console.WriteLine(modifiedQuery);
+    }
+   
+}
+
+// Output will be: [12Sp14].[dbo].[Saphran Data]
+CCO.Utilities.WriteDebug("Kunal",formattedDatabaseNames);
+CCO.Utilities.WriteDebug("Kunal",modifiedQuery);
+string serverPath = System.AppDomain.CurrentDomain.BaseDirectory;
+
+System.Xml.XmlDocument xmlDoc = new System.Xml.XmlDocument();
+serverPath = serverPath + "../Client/Innovator.xml";
+string serverURL = System.Web.HttpContext.Current.Request.Url.AbsoluteUri;
+string hostName = HttpContext.Current.Request.Url.Host; //Required if Remote Server Access is Turned OFF
+serverURL = serverURL.Replace(hostName,"localhost"); //Required if Remote Server Access is Turned OFF
+
+xmlDoc.Load(serverPath);
+string serverConfigPath = xmlDoc.SelectSingleNode("ConfigFilePath/@value").Value;
+xmlDoc.Load(serverConfigPath);
+
+string server = xmlDoc.SelectSingleNode("Innovator/DB-Connection/@server").Value;
+string uid = xmlDoc.SelectSingleNode("Innovator/DB-Connection/@dbo_uid").Value;
+string pwd = xmlDoc.SelectSingleNode("Innovator/DB-Connection/@dbo_pwd").Value;
+
+Aras.Server.Core.IOMConnection cnx=(Aras.Server.Core.IOMConnection)inn.getConnection();
+string db = cnx.GetDatabaseName();
+db = xmlDoc.SelectSingleNode("Innovator/DB-Connection/@database").Value;
+
+System.Data.SqlClient.SqlConnection conn = new System.Data.SqlClient.SqlConnection("server=" + server + ";database=" + db + ";uid=" + uid + ";password=" + pwd + ";");
+
+
+System.Data.SqlClient.SqlCommand pd = new System.Data.SqlClient.SqlCommand(modifiedQuery,conn);
+// System.Data.SqlClient.SqlCommand md = new System.Data.SqlClient.SqlCommand(model_table,conn);
+
+CCO.Utilities.WriteDebug("serverPath","Data: "+pd.CommandText.ToString());
+conn.Open();
+
+// Create a data adapter to retrieve data from the table
+System.Data.SqlClient.SqlDataAdapter adapter = new System.Data.SqlClient.SqlDataAdapter(pd);
+
+// Create a DataTable to hold the retrieved data
+System.Data.DataTable Saphran_DataTable = new System.Data.DataTable();
+
+// Fill the DataTable with data from the adapter
+adapter.Fill(Saphran_DataTable);
+
+conn.Close();
+Item itm = inn.newItem();
+string a ="";
+foreach(DataColumn column in Saphran_DataTable.Columns)
+ { 
+     a = a+","+column.ColumnName.ToString();
+     itm.setProperty("row0_column"+0,column.ColumnName.ToString());
+ }
+int r=0;
+foreach(DataRow row in Saphran_DataTable.Rows)
+ { 
+     for(int i=0;i<Saphran_DataTable.Columns.Count;i++){
+         itm.setProperty("row"+r+"_column"+i,row[i].ToString());
+     }
+     r++;
+ }
+
+ itm.setProperty("row",Saphran_DataTable.Rows.Count.ToString());
+ itm.setProperty("column",Saphran_DataTable.Columns.Count.ToString());
+ itm.setProperty("Header_Names",a);
+ CCO.Utilities.WriteDebug("sample_log",itm.ToString());
+return itm; 
+]]></method_code>
+  <method_type>C#</method_type>
+  <name>NA_DEN_SP_SqlConnection</name>
+ </Item>
+</AML>
